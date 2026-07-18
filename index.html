@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#10162b">
+<title>Lexis — Pronounce Hebrew &amp; Greek</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&family=Noto+Serif+Hebrew:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --lapis: #10162b;        /* deep lapis-ink background */
+    --lapis-raised: #1a2340; /* card surface */
+    --vellum: #ece5d3;       /* primary text */
+    --vellum-dim: #9aa0b4;   /* secondary text */
+    --gold: #d4a944;         /* gold-leaf accent */
+    --gold-deep: #a87f22;
+    --hairline: rgba(212, 169, 68, 0.25);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    min-height: 100%;
+    background: var(--lapis);
+    background-image: radial-gradient(ellipse 120% 60% at 50% -10%, #1c2547 0%, var(--lapis) 60%);
+    color: var(--vellum);
+    font-family: 'Cardo', 'Noto Serif Hebrew', Georgia, serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: max(env(safe-area-inset-top), 20px) 20px 40px;
+  }
+  header { text-align: center; margin-bottom: 26px; }
+  .eyebrow {
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 6px;
+  }
+  h1 { font-weight: 700; font-size: 26px; letter-spacing: 0.01em; }
+  h1 .gk { color: var(--gold); }
+  .tagline { color: var(--vellum-dim); font-size: 14px; margin-top: 4px; }
+
+  main { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 18px; }
+
+  /* The word display — the signature element */
+  #wordCard {
+    background: var(--lapis-raised);
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    padding: 34px 20px 22px;
+    text-align: center;
+    position: relative;
+    min-height: 190px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+  }
+  #langBadge {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--gold); border: 1px solid var(--hairline);
+    border-radius: 999px; padding: 3px 12px;
+    background: rgba(16,22,43,0.6);
+  }
+  #bigWord {
+    font-size: clamp(44px, 13vw, 76px);
+    line-height: 1.35;
+    font-weight: 400;
+    word-break: break-word;
+    unicode-bidi: plaintext; /* renders Hebrew RTL correctly */
+  }
+  #bigWord.hebrew { font-family: 'Noto Serif Hebrew', 'Cardo', serif; font-weight: 600; }
+  #bigWord.empty { font-size: 17px; color: var(--vellum-dim); font-style: italic; max-width: 32ch; line-height: 1.6; }
+  #bigWord.speaking { color: var(--gold); transition: color 0.15s; }
+  #voiceNote { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; color: var(--vellum-dim); margin-top: 14px; }
+
+  /* Primary action */
+  button {
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    border: none; cursor: pointer; border-radius: 12px;
+    transition: transform 0.06s ease, filter 0.15s ease;
+  }
+  button:active { transform: scale(0.985); }
+  button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+  #pasteBtn {
+    background: linear-gradient(180deg, var(--gold) 0%, var(--gold-deep) 100%);
+    color: #241a04;
+    font-size: 19px; font-weight: 700;
+    padding: 18px;
+    width: 100%;
+    letter-spacing: 0.01em;
+    box-shadow: 0 6px 24px rgba(212,169,68,0.25);
+  }
+  .row { display: flex; gap: 12px; }
+  .secondary {
+    flex: 1;
+    background: var(--lapis-raised);
+    border: 1px solid var(--hairline);
+    color: var(--vellum);
+    font-size: 15px; padding: 13px;
+  }
+  .secondary:disabled { opacity: 0.35; cursor: default; }
+
+  /* Speed control */
+  .speed {
+    display: flex; align-items: center; gap: 12px;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 13px; color: var(--vellum-dim);
+  }
+  .speed label { min-width: 44px; }
+  input[type=range] { flex: 1; accent-color: var(--gold); height: 28px; }
+  #speedVal { min-width: 40px; text-align: right; color: var(--vellum); font-variant-numeric: tabular-nums; }
+
+  /* Manual entry */
+  details { border-top: 1px solid var(--hairline); padding-top: 14px; }
+  summary {
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 13px; color: var(--vellum-dim); cursor: pointer;
+    list-style: none;
+  }
+  summary::before { content: "✦ "; color: var(--gold); }
+  #manualBox { display: flex; gap: 10px; margin-top: 12px; }
+  #manualInput {
+    flex: 1; background: var(--lapis-raised); border: 1px solid var(--hairline);
+    border-radius: 10px; color: var(--vellum); font-family: inherit;
+    font-size: 20px; padding: 10px 14px; unicode-bidi: plaintext;
+  }
+  #manualInput:focus-visible { outline: 2px solid var(--gold); }
+  #manualSpeak { background: var(--gold); color: #241a04; font-weight: 700; font-size: 15px; padding: 0 18px; }
+
+  /* Status / warnings */
+  #status {
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 13px; line-height: 1.55; color: var(--vellum-dim);
+    background: var(--lapis-raised); border: 1px solid var(--hairline);
+    border-radius: 10px; padding: 12px 14px; display: none;
+  }
+  #status.warn { display: block; border-color: rgba(220,120,80,0.5); }
+  #status b { color: var(--vellum); }
+
+  footer {
+    margin-top: 28px; font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 11px; color: var(--vellum-dim); text-align: center; line-height: 1.7;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Interlinear Companion</div>
+  <h1>Lexis <span class="gk">λέξις</span></h1>
+  <div class="tagline">Copy a word in Olive Tree · hear it spoken</div>
+</header>
+
+<main>
+  <div id="wordCard">
+    <span id="langBadge" hidden></span>
+    <div id="bigWord" class="empty">Highlight a Hebrew or Greek word in Olive Tree, tap Copy, then come back and tap the gold button.</div>
+    <div id="voiceNote"></div>
+  </div>
+
+  <button id="pasteBtn">Paste &amp; speak</button>
+
+  <div class="row">
+    <button class="secondary" id="againBtn" disabled>Speak again</button>
+    <button class="secondary" id="slowBtn" disabled>Speak slowly</button>
+  </div>
+
+  <div class="speed">
+    <label for="rate">Speed</label>
+    <input type="range" id="rate" min="0.5" max="1.1" step="0.05" value="0.85">
+    <span id="speedVal">0.85×</span>
+  </div>
+
+  <div id="status"></div>
+
+  <details>
+    <summary>Type or paste a word by hand</summary>
+    <div id="manualBox">
+      <input id="manualInput" type="text" autocomplete="off" autocapitalize="off"
+             placeholder="בְּרֵאשִׁית · λόγος" aria-label="Word to pronounce">
+      <button id="manualSpeak">Speak</button>
+    </div>
+  </details>
+</main>
+
+<footer>
+  Speech is generated on this device by its installed text-to-speech voices.<br>
+  Greek uses Modern Greek pronunciation; Hebrew uses Israeli (academic) pronunciation.
+</footer>
+
+<script>
+(function () {
+  const bigWord = document.getElementById('bigWord');
+  const langBadge = document.getElementById('langBadge');
+  const voiceNote = document.getElementById('voiceNote');
+  const statusBox = document.getElementById('status');
+  const pasteBtn = document.getElementById('pasteBtn');
+  const againBtn = document.getElementById('againBtn');
+  const slowBtn = document.getElementById('slowBtn');
+  const rateSlider = document.getElementById('rate');
+  const speedVal = document.getElementById('speedVal');
+  const manualInput = document.getElementById('manualInput');
+  const manualSpeak = document.getElementById('manualSpeak');
+
+  let currentWord = '';
+  let currentLang = null;
+  let voices = [];
+
+  const LANG_NAMES = { he: 'Hebrew · עברית', el: 'Greek · Ἑλληνική' };
+
+  function loadVoices() { voices = speechSynthesis.getVoices() || []; }
+  loadVoices();
+  if ('onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged = loadVoices;
+
+  function detectScript(text) {
+    if (/[\u0590-\u05FF\uFB1D-\uFB4F]/.test(text)) return 'he';
+    if (/[\u0370-\u03FF\u1F00-\u1FFF]/.test(text)) return 'el';
+    return null;
+  }
+
+  function cleanWord(text) {
+    // keep Hebrew (incl. niqqud + presentation forms), Greek (incl. polytonic), spaces
+    const kept = text.match(/[\u0590-\u05FF\uFB1D-\uFB4F\u0370-\u03FF\u1F00-\u1FFF\s]+/g);
+    return kept ? kept.join(' ').replace(/\s+/g, ' ').trim() : '';
+  }
+
+  function findVoice(lang) {
+    const tags = lang === 'he' ? ['he', 'iw'] : ['el'];
+    // prefer local (offline) voices
+    const match = v => tags.some(t => v.lang && v.lang.toLowerCase().startsWith(t));
+    return voices.find(v => match(v) && v.localService) || voices.find(match) || null;
+  }
+
+  function warn(html) { statusBox.innerHTML = html; statusBox.className = 'warn'; }
+  function clearWarn() { statusBox.className = ''; statusBox.innerHTML = ''; }
+
+  function speak(word, lang, rateOverride) {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(word);
+    u.lang = lang === 'he' ? 'he-IL' : 'el-GR';
+    const v = findVoice(lang);
+    if (v) { u.voice = v; voiceNote.textContent = 'Voice: ' + v.name; }
+    else {
+      voiceNote.textContent = '';
+      warn('<b>No ' + (lang === 'he' ? 'Hebrew' : 'Greek') + ' voice found on this device.</b> On a Samsung tablet: Settings → General management → Text-to-speech → Google Speech Services → Settings → Install voice data, then add ' + (lang === 'he' ? 'Hebrew' : 'Greek') + '.');
+    }
+    u.rate = rateOverride ?? parseFloat(rateSlider.value);
+    u.pitch = 1;
+    bigWord.classList.add('speaking');
+    u.onend = () => bigWord.classList.remove('speaking');
+    u.onerror = () => bigWord.classList.remove('speaking');
+    speechSynthesis.speak(u);
+  }
+
+  function present(raw) {
+    clearWarn();
+    const word = cleanWord(raw);
+    const lang = detectScript(word);
+    if (!word || !lang) {
+      warn('<b>No Hebrew or Greek text found on the clipboard.</b> In Olive Tree, highlight the original-language word (not the English gloss), tap <b>Copy</b>, then return here.');
+      return;
+    }
+    currentWord = word;
+    currentLang = lang;
+    bigWord.textContent = word;
+    bigWord.className = lang === 'he' ? 'hebrew' : '';
+    langBadge.textContent = LANG_NAMES[lang];
+    langBadge.hidden = false;
+    againBtn.disabled = false;
+    slowBtn.disabled = false;
+    speak(word, lang);
+  }
+
+  pasteBtn.addEventListener('click', async () => {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error('unsupported');
+      const text = await navigator.clipboard.readText();
+      present(text);
+    } catch (e) {
+      warn('<b>Couldn\u2019t read the clipboard.</b> Your browser may have blocked it \u2014 allow clipboard access when prompted, or use \u201cType or paste a word by hand\u201d below and long-press \u2192 Paste.');
+    }
+  });
+
+  againBtn.addEventListener('click', () => { if (currentWord) speak(currentWord, currentLang); });
+  slowBtn.addEventListener('click', () => { if (currentWord) speak(currentWord, currentLang, 0.55); });
+
+  rateSlider.addEventListener('input', () => { speedVal.textContent = parseFloat(rateSlider.value).toFixed(2) + '\u00d7'; });
+
+  manualSpeak.addEventListener('click', () => present(manualInput.value));
+  manualInput.addEventListener('keydown', e => { if (e.key === 'Enter') present(manualInput.value); });
+
+  // Register service worker for offline use
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
