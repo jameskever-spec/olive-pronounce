@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#10162b">
-<title>Lexis — Pronounce Hebrew &amp; Greek</title>
+<title>Lexis — Pronounce &amp; Read</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -66,6 +66,7 @@
     color: var(--gold); border: 1px solid var(--hairline);
     border-radius: 999px; padding: 3px 12px;
     background: rgba(16,22,43,0.6);
+    white-space: nowrap;
   }
   #bigWord {
     font-size: clamp(44px, 13vw, 76px);
@@ -73,10 +74,18 @@
     font-weight: 400;
     word-break: break-word;
     unicode-bidi: plaintext;
+    width: 100%;
   }
   #bigWord.hebrew { font-family: 'Noto Serif Hebrew', 'Cardo', serif; font-weight: 600; }
-  #bigWord.empty { font-size: 17px; color: var(--vellum-dim); font-style: italic; max-width: 32ch; line-height: 1.6; }
+  #bigWord.empty { font-size: 17px; color: var(--vellum-dim); font-style: italic; max-width: 34ch; line-height: 1.6; margin: 0 auto; }
   #bigWord.speaking { color: var(--gold); transition: color 0.15s; }
+  #bigWord.passage {
+    font-size: 19px; line-height: 1.75; text-align: left;
+    max-height: 42vh; overflow-y: auto; padding: 2px 4px;
+    color: var(--vellum);
+  }
+  #bigWord.passage .sent { transition: color 0.2s, background 0.2s; border-radius: 4px; }
+  #bigWord.passage .sent.active { color: var(--gold); background: rgba(212,169,68,0.08); }
   #voiceNote { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; color: var(--vellum-dim); margin-top: 14px; }
 
   button {
@@ -95,6 +104,14 @@
     letter-spacing: 0.01em;
     box-shadow: 0 6px 24px rgba(212,169,68,0.25);
   }
+  #readEnBtn {
+    width: 100%;
+    background: var(--lapis-raised);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    font-size: 17px; font-weight: 700;
+    padding: 15px;
+  }
   .row { display: flex; gap: 12px; }
   .secondary {
     flex: 1;
@@ -104,6 +121,7 @@
     font-size: 15px; padding: 13px;
   }
   .secondary:disabled { opacity: 0.35; cursor: default; }
+  #stopBtn { color: var(--miss); border-color: rgba(217,153,92,0.4); }
 
   .speed {
     display: flex; align-items: center; gap: 12px;
@@ -114,7 +132,6 @@
   input[type=range] { flex: 1; accent-color: var(--gold); height: 28px; }
   #speedVal { min-width: 40px; text-align: right; color: var(--vellum); font-variant-numeric: tabular-nums; }
 
-  /* Voice status card */
   #voicesCard {
     background: var(--lapis-raised);
     border: 1px solid var(--hairline);
@@ -127,16 +144,22 @@
     color: var(--gold); font-weight: 600; margin-bottom: 10px;
   }
   .vrow {
-    display: flex; justify-content: space-between; align-items: baseline;
-    padding: 7px 0; font-size: 14px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 8px 0; font-size: 14px;
     border-bottom: 1px solid rgba(154,160,180,0.12);
   }
   .vrow:last-of-type { border-bottom: none; }
-  .vlang { color: var(--vellum); }
-  .vstat { font-size: 13px; color: var(--vellum-dim); text-align: right; max-width: 60%; }
+  .vlang { color: var(--vellum); flex-shrink: 0; }
+  .vstat { font-size: 13px; color: var(--vellum-dim); text-align: right; }
   .vstat.ok { color: var(--ok); }
   .vstat.miss { color: var(--miss); font-weight: 600; }
-
+  select {
+    background: var(--lapis); color: var(--vellum);
+    border: 1px solid var(--hairline); border-radius: 8px;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 13px; padding: 8px 10px;
+    max-width: 58%;
+  }
   #fixBox {
     margin-top: 12px; padding-top: 12px;
     border-top: 1px solid var(--hairline);
@@ -146,17 +169,12 @@
   #fixBox ol { margin: 8px 0 10px 20px; }
   #fixBox li { margin-bottom: 4px; }
   .fixTools { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
-  #platformPick {
-    background: var(--lapis); color: var(--vellum);
-    border: 1px solid var(--hairline); border-radius: 8px;
-    font-family: ui-sans-serif, system-ui, sans-serif;
-    font-size: 13px; padding: 8px 10px;
-  }
   #recheckBtn {
     background: var(--lapis); border: 1px solid var(--hairline);
     color: var(--gold); font-size: 13px; font-weight: 600; padding: 8px 14px;
   }
   #allSet { margin-top: 10px; font-size: 13px; color: var(--ok); display: none; }
+  .voiceHint { margin-top: 10px; font-size: 12px; color: var(--vellum-dim); line-height: 1.5; }
 
   details.manual { border-top: 1px solid var(--hairline); padding-top: 14px; }
   summary {
@@ -196,17 +214,23 @@
 <header>
   <div class="eyebrow">Interlinear Companion</div>
   <h1>Lexis <span class="gk">λέξις</span></h1>
-  <div class="tagline">Copy a word in Olive Tree · hear it spoken</div>
+  <div class="tagline">Copy in Olive Tree · hear it spoken</div>
 </header>
 
 <main>
   <div id="wordCard">
     <span id="langBadge" hidden></span>
-    <div id="bigWord" class="empty">Highlight a Hebrew or Greek word in Olive Tree, tap Copy, then come back and tap the gold button.</div>
+    <div id="bigWord" class="empty">Highlight a Hebrew or Greek word — or a whole English passage — in Olive Tree, tap Copy, then come back and tap a button below.</div>
     <div id="voiceNote"></div>
   </div>
 
   <button id="pasteBtn">Paste &amp; speak</button>
+  <button id="readEnBtn">Paste &amp; read in English</button>
+
+  <div class="row" id="readControls" hidden>
+    <button class="secondary" id="pauseBtn">Pause</button>
+    <button class="secondary" id="stopBtn">Stop</button>
+  </div>
 
   <div class="row">
     <button class="secondary" id="againBtn" disabled>Speak again</button>
@@ -215,8 +239,8 @@
 
   <div class="speed">
     <label for="rate">Speed</label>
-    <input type="range" id="rate" min="0.5" max="1.1" step="0.05" value="0.85">
-    <span id="speedVal">0.85×</span>
+    <input type="range" id="rate" min="0.5" max="1.2" step="0.05" value="0.9">
+    <span id="speedVal">0.90×</span>
   </div>
 
   <div id="status"></div>
@@ -225,7 +249,8 @@
     <h2>Voices on this device</h2>
     <div class="vrow"><span class="vlang">Hebrew · עברית</span><span class="vstat" id="heStat">checking…</span></div>
     <div class="vrow"><span class="vlang">Greek · Ἑλληνική</span><span class="vstat" id="elStat">checking…</span></div>
-    <div id="allSet">✓ You're all set — both languages can be spoken offline.</div>
+    <div class="vrow"><span class="vlang">English narrator</span><select id="enVoicePick" aria-label="Choose English narrator voice"><option>checking…</option></select></div>
+    <div id="allSet">✓ You're all set — everything can be spoken offline.</div>
     <div id="fixBox" hidden>
       <div id="fixGuide"></div>
       <div class="fixTools">
@@ -233,13 +258,14 @@
         <button id="recheckBtn">Re-check voices</button>
       </div>
     </div>
+    <div class="voiceHint">The narrator list shows every English voice this device offers. To add more voices (male, female, other accents), install them in your device's text-to-speech settings — they'll appear here automatically.</div>
   </section>
 
   <details class="manual">
-    <summary>Type or paste a word by hand</summary>
+    <summary>Type or paste text by hand</summary>
     <div id="manualBox">
       <input id="manualInput" type="text" autocomplete="off" autocapitalize="off"
-             placeholder="בְּרֵאשִׁית · λόγος" aria-label="Word to pronounce">
+             placeholder="בְּרֵאשִׁית · λόγος · In the beginning…" aria-label="Text to speak">
       <button id="manualSpeak">Speak</button>
     </div>
   </details>
@@ -247,76 +273,66 @@
 
 <footer>
   Speech is generated on this device by its installed text-to-speech voices.<br>
-  Greek uses Modern Greek pronunciation; Hebrew uses Israeli (academic) pronunciation.
+  Verse numbers and bracketed notes are removed automatically during English narration.
 </footer>
 
 <script>
 (function () {
-  const bigWord = document.getElementById('bigWord');
-  const langBadge = document.getElementById('langBadge');
-  const voiceNote = document.getElementById('voiceNote');
-  const statusBox = document.getElementById('status');
-  const pasteBtn = document.getElementById('pasteBtn');
-  const againBtn = document.getElementById('againBtn');
-  const slowBtn = document.getElementById('slowBtn');
-  const rateSlider = document.getElementById('rate');
-  const speedVal = document.getElementById('speedVal');
-  const manualInput = document.getElementById('manualInput');
-  const manualSpeak = document.getElementById('manualSpeak');
-  const heStat = document.getElementById('heStat');
-  const elStat = document.getElementById('elStat');
-  const fixBox = document.getElementById('fixBox');
-  const fixGuide = document.getElementById('fixGuide');
-  const platformPick = document.getElementById('platformPick');
-  const recheckBtn = document.getElementById('recheckBtn');
-  const allSet = document.getElementById('allSet');
+  const $ = id => document.getElementById(id);
+  const bigWord = $('bigWord'), langBadge = $('langBadge'), voiceNote = $('voiceNote');
+  const statusBox = $('status'), pasteBtn = $('pasteBtn'), readEnBtn = $('readEnBtn');
+  const againBtn = $('againBtn'), slowBtn = $('slowBtn');
+  const pauseBtn = $('pauseBtn'), stopBtn = $('stopBtn'), readControls = $('readControls');
+  const rateSlider = $('rate'), speedVal = $('speedVal');
+  const manualInput = $('manualInput'), manualSpeak = $('manualSpeak');
+  const heStat = $('heStat'), elStat = $('elStat'), enVoicePick = $('enVoicePick');
+  const fixBox = $('fixBox'), fixGuide = $('fixGuide');
+  const platformPick = $('platformPick'), recheckBtn = $('recheckBtn'), allSet = $('allSet');
 
-  let currentWord = '';
-  let currentLang = null;
-  let voices = [];
+  let currentWord = '', currentLang = null, voices = [];
+  let reading = false, paused = false, sentIndex = 0, sentences = [];
 
-  const LANG_NAMES = { he: 'Hebrew · עברית', el: 'Greek · Ἑλληνική' };
+  const LANG_NAMES = { he: 'Hebrew · עברית', el: 'Greek · Ἑλληνική', en: 'English narration' };
 
   /* ---------- Platform detection & voice-install guides ---------- */
 
   const GUIDES = {
     android: {
       label: 'Android / Samsung',
-      html: '<b>Install Hebrew or Greek voices on Android:</b><ol>' +
+      html: '<b>Install voices on Android:</b><ol>' +
         '<li>Open <b>Settings → General management → Text-to-speech output</b> (on some phones: Settings → Accessibility → Text-to-speech).</li>' +
         '<li>Make sure the preferred engine is <b>Speech Services by Google</b>, then tap the <b>gear ⚙</b> next to it.</li>' +
-        '<li>Tap <b>Install voice data</b>, then choose <b>Hebrew</b> and/or <b>Greek</b> to download.</li>' +
+        '<li>Tap <b>Install voice data</b>, then choose <b>Hebrew</b>, <b>Greek</b>, or additional <b>English</b> voices to download.</li>' +
         '<li>Come back here and tap <b>Re-check voices</b>.</li></ol>' +
-        'The download is one-time; after that, speech works fully offline.'
+        'Downloads are one-time; after that, speech works fully offline.'
     },
     ios: {
       label: 'iPhone / iPad',
-      html: '<b>Install Hebrew or Greek voices on iPhone/iPad:</b><ol>' +
+      html: '<b>Install voices on iPhone/iPad:</b><ol>' +
         '<li>Open <b>Settings → Accessibility → Spoken Content → Voices</b>.</li>' +
-        '<li>Choose <b>Hebrew</b> (voice: Carmit) or <b>Greek</b> (voice: Melina) and tap the download.</li>' +
-        '<li>Return here and tap <b>Re-check voices</b>.</li></ol>' +
-        'Most iPhones and iPads already include these voices.'
+        '<li>Choose <b>Hebrew</b> (Carmit), <b>Greek</b> (Melina), or <b>English</b> for more narrator options, and tap the download.</li>' +
+        '<li>Return here and tap <b>Re-check voices</b>.</li></ol>'
     },
     windows: {
       label: 'Windows',
-      html: '<b>Install Hebrew or Greek voices on Windows:</b><ol>' +
+      html: '<b>Install voices on Windows:</b><ol>' +
         '<li>Open <b>Settings → Time &amp; Language → Language &amp; region</b>.</li>' +
         '<li>Click <b>Add a language</b>, pick <b>Hebrew</b> or <b>Greek</b>, and check the <b>Text-to-speech</b> feature during install.</li>' +
         '<li>Restart the browser, return here, and tap <b>Re-check voices</b>.</li></ol>' +
-        'Note: Chrome and Edge on Windows also offer online voices that work without this step while you\u2019re connected.'
+        'Chrome and Edge on Windows also offer online voices that work without this step while connected.'
     },
     mac: {
       label: 'Mac',
-      html: '<b>Install Hebrew or Greek voices on a Mac:</b><ol>' +
+      html: '<b>Install voices on a Mac:</b><ol>' +
         '<li>Open <b>System Settings → Accessibility → Spoken Content</b>.</li>' +
         '<li>Click <b>System Voice → Manage Voices…</b></li>' +
-        '<li>Find <b>Hebrew</b> (Carmit) or <b>Greek</b> (Melina) and download.</li>' +
+        '<li>Download <b>Hebrew</b> (Carmit), <b>Greek</b> (Melina), or extra <b>English</b> voices.</li>' +
         '<li>Restart the browser, return here, and tap <b>Re-check voices</b>.</li></ol>'
     },
     linux: {
       label: 'Linux',
-      html: '<b>Hebrew or Greek voices on Linux:</b><ol>' +
-        '<li>Most browsers on Linux use <b>speech-dispatcher</b> with <b>espeak-ng</b>, which already includes Hebrew and Greek.</li>' +
+      html: '<b>Voices on Linux:</b><ol>' +
+        '<li>Most browsers on Linux use <b>speech-dispatcher</b> with <b>espeak-ng</b>, which already includes Hebrew, Greek, and English.</li>' +
         '<li>If nothing is found, install them: <b>sudo apt install espeak-ng speech-dispatcher</b> (Debian/Ubuntu) or the equivalent for your distro.</li>' +
         '<li>Restart the browser, return here, and tap <b>Re-check voices</b>.</li></ol>'
     }
@@ -326,7 +342,6 @@
     const ua = navigator.userAgent || '';
     if (/Android/i.test(ua)) return 'android';
     if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
-    // iPadOS pretends to be a Mac but has touch
     if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return 'ios';
     if (/Windows/i.test(ua)) return 'windows';
     if (/Macintosh|Mac OS X/i.test(ua)) return 'mac';
@@ -334,7 +349,6 @@
     return 'android';
   }
 
-  // Build the platform picker
   const detected = detectPlatform();
   Object.keys(GUIDES).forEach(key => {
     const opt = document.createElement('option');
@@ -343,13 +357,13 @@
     if (key === detected) opt.selected = true;
     platformPick.appendChild(opt);
   });
-
-  function showGuide() {
-    fixGuide.innerHTML = GUIDES[platformPick.value].html;
-  }
+  function showGuide() { fixGuide.innerHTML = GUIDES[platformPick.value].html; }
   platformPick.addEventListener('change', showGuide);
 
-  /* ---------- Voice loading & status ---------- */
+  /* ---------- Voice loading, status & English narrator picker ---------- */
+
+  function remember(key, val) { try { localStorage.setItem(key, val); } catch (e) {} }
+  function recall(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
 
   function findVoice(lang) {
     const tags = lang === 'he' ? ['he', 'iw'] : ['el'];
@@ -357,19 +371,46 @@
     return voices.find(v => match(v) && v.localService) || voices.find(match) || null;
   }
 
-  function updateVoiceStatus() {
-    voices = speechSynthesis.getVoices() || [];
-    if (!voices.length) {
-      heStat.textContent = 'checking…'; heStat.className = 'vstat';
-      elStat.textContent = 'checking…'; elStat.className = 'vstat';
+  function englishVoices() {
+    return voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('en'))
+      .sort((a, b) => (b.localService - a.localService) || a.name.localeCompare(b.name));
+  }
+
+  function selectedEnglishVoice() {
+    const list = englishVoices();
+    const want = enVoicePick.value || recall('lexis-en-voice');
+    return list.find(v => v.name === want) || list[0] || null;
+  }
+
+  function populateEnglishPicker() {
+    const list = englishVoices();
+    const saved = recall('lexis-en-voice');
+    enVoicePick.innerHTML = '';
+    if (!list.length) {
+      const opt = document.createElement('option');
+      opt.textContent = 'None found';
+      enVoicePick.appendChild(opt);
       return;
     }
-    const he = findVoice('he');
-    const el = findVoice('el');
+    list.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.name;
+      opt.textContent = v.name + (v.localService ? '' : ' (online)');
+      if (v.name === saved) opt.selected = true;
+      enVoicePick.appendChild(opt);
+    });
+  }
+  enVoicePick.addEventListener('change', () => remember('lexis-en-voice', enVoicePick.value));
+
+  function updateVoiceStatus() {
+    voices = speechSynthesis.getVoices() || [];
+    if (!voices.length) return;
+    const he = findVoice('he'), el = findVoice('el');
     heStat.textContent = he ? '✓ ' + he.name : 'Not installed';
     heStat.className = 'vstat ' + (he ? 'ok' : 'miss');
     elStat.textContent = el ? '✓ ' + el.name : 'Not installed';
     elStat.className = 'vstat ' + (el ? 'ok' : 'miss');
+    populateEnglishPicker();
     if (he && el) {
       fixBox.hidden = true;
       allSet.style.display = 'block';
@@ -382,27 +423,64 @@
 
   updateVoiceStatus();
   if ('onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged = updateVoiceStatus;
-  // Re-check when the user comes back from Settings
   document.addEventListener('visibilitychange', () => { if (!document.hidden) updateVoiceStatus(); });
   recheckBtn.addEventListener('click', updateVoiceStatus);
 
-  /* ---------- Word handling & speech ---------- */
+  /* ---------- Text cleaning ---------- */
 
   function detectScript(text) {
     if (/[\u0590-\u05FF\uFB1D-\uFB4F]/.test(text)) return 'he';
     if (/[\u0370-\u03FF\u1F00-\u1FFF]/.test(text)) return 'el';
+    if (/[A-Za-z]/.test(text)) return 'en';
     return null;
   }
 
-  function cleanWord(text) {
+  function cleanOriginal(text) {
     const kept = text.match(/[\u0590-\u05FF\uFB1D-\uFB4F\u0370-\u03FF\u1F00-\u1FFF\s]+/g);
     return kept ? kept.join(' ').replace(/\s+/g, ' ').trim() : '';
   }
 
+  function cleanEnglish(text) {
+    let t = text;
+    t = t.replace(/\[[^\]]*\]/g, ' ');                      // [translator notes], [a]
+    t = t.replace(/\((?:[a-z]|[ivxlc]{1,4}|\d{1,3})\)/gi, ' '); // (a) (12) footnote markers
+    t = t.replace(/[\u2070-\u209F\u00B9\u00B2\u00B3\u00AA\u00BA]/g, ''); // super/subscripts
+    t = t.replace(/\b\d+\s*:\s*\d+(?:\s*[-\u2013]\s*\d+)?\b/g, ' ');    // 3:16, 3:16-18 refs
+    t = t.replace(/\d+/g, ' ');                              // verse numbers
+    t = t.replace(/\s+([,.;:!?'\u2019\u201D)])/g, '$1');     // tidy space before punctuation
+    t = t.replace(/\s+/g, ' ').trim();
+    return t;
+  }
+
+  function splitSentences(t) {
+    const parts = t.match(/[^.!?]+[.!?]+["'\u2019\u201D]?\s*|[^.!?]+$/g) || [t];
+    const out = [];
+    parts.forEach(p => {
+      p = p.trim();
+      if (!p) return;
+      while (p.length > 220) {                // keep utterances short so Android never stalls
+        let cut = p.lastIndexOf(',', 200);
+        if (cut < 80) cut = p.lastIndexOf(' ', 200);
+        if (cut < 1) cut = 200;
+        out.push(p.slice(0, cut + 1).trim());
+        p = p.slice(cut + 1).trim();
+      }
+      if (p) out.push(p);
+    });
+    return out;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* ---------- Speech: single word (Hebrew/Greek) ---------- */
+
   function warn(html) { statusBox.innerHTML = html; statusBox.className = 'warn'; }
   function clearWarn() { statusBox.className = ''; statusBox.innerHTML = ''; }
 
-  function speak(word, lang, rateOverride) {
+  function speakWord(word, lang, rateOverride) {
+    stopReading(true);
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(word);
     u.lang = lang === 'he' ? 'he-IL' : 'el-GR';
@@ -410,54 +488,131 @@
     if (v) { u.voice = v; voiceNote.textContent = 'Voice: ' + v.name; }
     else {
       voiceNote.textContent = '';
-      warn('<b>No ' + (lang === 'he' ? 'Hebrew' : 'Greek') + ' voice is installed yet.</b> See \u201cVoices on this device\u201d below for the exact steps on this device.');
+      warn('<b>No ' + (lang === 'he' ? 'Hebrew' : 'Greek') + ' voice is installed yet.</b> See \u201cVoices on this device\u201d below for the exact steps.');
       fixBox.hidden = false;
       showGuide();
     }
     u.rate = rateOverride ?? parseFloat(rateSlider.value);
-    u.pitch = 1;
     bigWord.classList.add('speaking');
     u.onend = () => bigWord.classList.remove('speaking');
     u.onerror = () => bigWord.classList.remove('speaking');
     speechSynthesis.speak(u);
   }
 
-  function present(raw) {
+  /* ---------- Speech: English passage reader ---------- */
+
+  function stopReading(silent) {
+    reading = false; paused = false;
+    speechSynthesis.cancel();
+    readControls.hidden = true;
+    pauseBtn.textContent = 'Pause';
+    const act = bigWord.querySelector('.sent.active');
+    if (act) act.classList.remove('active');
+    if (!silent) voiceNote.textContent = '';
+  }
+
+  function readNextSentence() {
+    if (!reading || sentIndex >= sentences.length) { stopReading(true); return; }
+    const spans = bigWord.querySelectorAll('.sent');
+    spans.forEach(s => s.classList.remove('active'));
+    const span = spans[sentIndex];
+    if (span) { span.classList.add('active'); span.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+    const u = new SpeechSynthesisUtterance(sentences[sentIndex]);
+    const v = selectedEnglishVoice();
+    if (v) { u.voice = v; u.lang = v.lang; voiceNote.textContent = 'Narrator: ' + v.name; }
+    else { u.lang = 'en-US'; }
+    u.rate = parseFloat(rateSlider.value);
+    u.onend = () => { if (reading) { sentIndex++; readNextSentence(); } };
+    u.onerror = () => { if (reading) { sentIndex++; readNextSentence(); } };
+    speechSynthesis.speak(u);
+  }
+
+  function presentEnglish(raw) {
     clearWarn();
-    const word = cleanWord(raw);
-    const lang = detectScript(word);
-    if (!word || !lang) {
-      warn('<b>No Hebrew or Greek text found on the clipboard.</b> In Olive Tree, highlight the original-language word (not the English gloss), tap <b>Copy</b>, then return here.');
+    const text = cleanEnglish(raw);
+    if (!text || !/[A-Za-z]/.test(text)) {
+      warn('<b>No English text found on the clipboard.</b> In Olive Tree, long-press and drag to select the passage, tap <b>Copy</b>, then return here.');
       return;
     }
-    currentWord = word;
-    currentLang = lang;
+    stopReading(true);
+    sentences = splitSentences(text);
+    sentIndex = 0;
+    currentWord = text; currentLang = 'en';
+    bigWord.className = 'passage';
+    bigWord.innerHTML = sentences.map(s => '<span class="sent">' + escapeHtml(s) + '</span>').join(' ');
+    bigWord.scrollTop = 0;
+    langBadge.textContent = LANG_NAMES.en;
+    langBadge.hidden = false;
+    againBtn.disabled = false;
+    slowBtn.disabled = true;
+    readControls.hidden = false;
+    reading = true; paused = false;
+    readNextSentence();
+  }
+
+  pauseBtn.addEventListener('click', () => {
+    if (!reading) return;
+    if (!paused) { speechSynthesis.pause(); paused = true; pauseBtn.textContent = 'Resume'; }
+    else { speechSynthesis.resume(); paused = false; pauseBtn.textContent = 'Pause'; }
+  });
+  stopBtn.addEventListener('click', () => stopReading());
+
+  /* ---------- Word display & routing ---------- */
+
+  function presentOriginal(raw) {
+    clearWarn();
+    const word = cleanOriginal(raw);
+    const lang = detectScript(word);
+    if (!word || !lang) return false;
+    stopReading(true);
+    currentWord = word; currentLang = lang;
     bigWord.textContent = word;
     bigWord.className = lang === 'he' ? 'hebrew' : '';
     langBadge.textContent = LANG_NAMES[lang];
     langBadge.hidden = false;
     againBtn.disabled = false;
     slowBtn.disabled = false;
-    speak(word, lang);
+    readControls.hidden = true;
+    speakWord(word, lang);
+    return true;
+  }
+
+  function route(raw, forceEnglish) {
+    const script = detectScript(raw || '');
+    if (forceEnglish) { presentEnglish(raw); return; }
+    if (script === 'he' || script === 'el') { presentOriginal(raw); return; }
+    if (script === 'en') { presentEnglish(raw); return; }
+    warn('<b>No Hebrew, Greek, or English text found on the clipboard.</b> Highlight text in Olive Tree, tap <b>Copy</b>, then return here.');
+  }
+
+  async function readClipboard() {
+    if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error('unsupported');
+    return navigator.clipboard.readText();
+  }
+  function clipboardFail() {
+    warn('<b>Couldn\u2019t read the clipboard.</b> Your browser may have blocked it \u2014 allow clipboard access when prompted, or use \u201cType or paste text by hand\u201d below and long-press \u2192 Paste.');
   }
 
   pasteBtn.addEventListener('click', async () => {
-    try {
-      if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error('unsupported');
-      const text = await navigator.clipboard.readText();
-      present(text);
-    } catch (e) {
-      warn('<b>Couldn\u2019t read the clipboard.</b> Your browser may have blocked it \u2014 allow clipboard access when prompted, or use \u201cType or paste a word by hand\u201d below and long-press \u2192 Paste.');
-    }
+    try { route(await readClipboard(), false); } catch (e) { clipboardFail(); }
+  });
+  readEnBtn.addEventListener('click', async () => {
+    try { route(await readClipboard(), true); } catch (e) { clipboardFail(); }
   });
 
-  againBtn.addEventListener('click', () => { if (currentWord) speak(currentWord, currentLang); });
-  slowBtn.addEventListener('click', () => { if (currentWord) speak(currentWord, currentLang, 0.55); });
+  againBtn.addEventListener('click', () => {
+    if (!currentWord) return;
+    if (currentLang === 'en') { presentEnglish(currentWord); }
+    else { speakWord(currentWord, currentLang); }
+  });
+  slowBtn.addEventListener('click', () => {
+    if (currentWord && currentLang !== 'en') speakWord(currentWord, currentLang, 0.55);
+  });
 
   rateSlider.addEventListener('input', () => { speedVal.textContent = parseFloat(rateSlider.value).toFixed(2) + '\u00d7'; });
 
-  manualSpeak.addEventListener('click', () => present(manualInput.value));
-  manualInput.addEventListener('keydown', e => { if (e.key === 'Enter') present(manualInput.value); });
+  manualSpeak.addEventListener('click', () => route(manualInput.value, false));
+  manualInput.addEventListener('keydown', e => { if (e.key === 'Enter') route(manualInput.value, false); });
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
