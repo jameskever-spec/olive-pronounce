@@ -273,7 +273,8 @@
 
 <footer>
   Speech is generated on this device by its installed text-to-speech voices.<br>
-  Verse numbers and bracketed notes are removed automatically during English narration.
+  Verse numbers and bracketed notes are removed automatically during English narration.<br>
+  Lexis v4
 </footer>
 
 <script>
@@ -512,7 +513,8 @@
   }
 
   function readNextSentence() {
-    if (!reading || sentIndex >= sentences.length) { stopReading(true); return; }
+    if (!reading || paused) return;
+    if (sentIndex >= sentences.length) { stopReading(true); return; }
     const spans = bigWord.querySelectorAll('.sent');
     spans.forEach(s => s.classList.remove('active'));
     const span = spans[sentIndex];
@@ -522,8 +524,8 @@
     if (v) { u.voice = v; u.lang = v.lang; voiceNote.textContent = 'Narrator: ' + v.name; }
     else { u.lang = 'en-US'; }
     u.rate = parseFloat(rateSlider.value);
-    u.onend = () => { if (reading) { sentIndex++; readNextSentence(); } };
-    u.onerror = () => { if (reading) { sentIndex++; readNextSentence(); } };
+    u.onend = () => { if (reading && !paused) { sentIndex++; readNextSentence(); } };
+    u.onerror = () => { if (reading && !paused) { sentIndex++; readNextSentence(); } };
     speechSynthesis.speak(u);
   }
 
@@ -552,8 +554,15 @@
 
   pauseBtn.addEventListener('click', () => {
     if (!reading) return;
-    if (!paused) { speechSynthesis.pause(); paused = true; pauseBtn.textContent = 'Resume'; }
-    else { speechSynthesis.resume(); paused = false; pauseBtn.textContent = 'Pause'; }
+    if (!paused) {
+      paused = true;
+      pauseBtn.textContent = 'Resume';
+      speechSynthesis.cancel();   // Chrome on Android can't reliably resume a paused engine,
+    } else {                      // so we stop fully and restart at the current sentence.
+      paused = false;
+      pauseBtn.textContent = 'Pause';
+      readNextSentence();
+    }
   });
   stopBtn.addEventListener('click', () => stopReading());
 
