@@ -1,4 +1,4 @@
-const CACHE = 'lexis-v1';
+const CACHE = 'lexis-v2';
 const PRECACHE = [
   './',
   './index.html',

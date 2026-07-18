@@ -13,13 +13,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&family=Noto+Serif+Hebrew:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --lapis: #10162b;        /* deep lapis-ink background */
-    --lapis-raised: #1a2340; /* card surface */
-    --vellum: #ece5d3;       /* primary text */
-    --vellum-dim: #9aa0b4;   /* secondary text */
-    --gold: #d4a944;         /* gold-leaf accent */
+    --lapis: #10162b;
+    --lapis-raised: #1a2340;
+    --vellum: #ece5d3;
+    --vellum-dim: #9aa0b4;
+    --gold: #d4a944;
     --gold-deep: #a87f22;
     --hairline: rgba(212, 169, 68, 0.25);
+    --ok: #7fbf8e;
+    --miss: #d9995c;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { height: 100%; }
@@ -46,7 +48,6 @@
 
   main { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 18px; }
 
-  /* The word display — the signature element */
   #wordCard {
     background: var(--lapis-raised);
     border: 1px solid var(--hairline);
@@ -71,14 +72,13 @@
     line-height: 1.35;
     font-weight: 400;
     word-break: break-word;
-    unicode-bidi: plaintext; /* renders Hebrew RTL correctly */
+    unicode-bidi: plaintext;
   }
   #bigWord.hebrew { font-family: 'Noto Serif Hebrew', 'Cardo', serif; font-weight: 600; }
   #bigWord.empty { font-size: 17px; color: var(--vellum-dim); font-style: italic; max-width: 32ch; line-height: 1.6; }
   #bigWord.speaking { color: var(--gold); transition: color 0.15s; }
   #voiceNote { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; color: var(--vellum-dim); margin-top: 14px; }
 
-  /* Primary action */
   button {
     font-family: ui-sans-serif, system-ui, sans-serif;
     border: none; cursor: pointer; border-radius: 12px;
@@ -105,7 +105,6 @@
   }
   .secondary:disabled { opacity: 0.35; cursor: default; }
 
-  /* Speed control */
   .speed {
     display: flex; align-items: center; gap: 12px;
     font-family: ui-sans-serif, system-ui, sans-serif;
@@ -115,8 +114,51 @@
   input[type=range] { flex: 1; accent-color: var(--gold); height: 28px; }
   #speedVal { min-width: 40px; text-align: right; color: var(--vellum); font-variant-numeric: tabular-nums; }
 
-  /* Manual entry */
-  details { border-top: 1px solid var(--hairline); padding-top: 14px; }
+  /* Voice status card */
+  #voicesCard {
+    background: var(--lapis-raised);
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    padding: 16px 16px 14px;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  #voicesCard h2 {
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--gold); font-weight: 600; margin-bottom: 10px;
+  }
+  .vrow {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 7px 0; font-size: 14px;
+    border-bottom: 1px solid rgba(154,160,180,0.12);
+  }
+  .vrow:last-of-type { border-bottom: none; }
+  .vlang { color: var(--vellum); }
+  .vstat { font-size: 13px; color: var(--vellum-dim); text-align: right; max-width: 60%; }
+  .vstat.ok { color: var(--ok); }
+  .vstat.miss { color: var(--miss); font-weight: 600; }
+
+  #fixBox {
+    margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid var(--hairline);
+    font-size: 13px; line-height: 1.6; color: var(--vellum-dim);
+  }
+  #fixBox b { color: var(--vellum); }
+  #fixBox ol { margin: 8px 0 10px 20px; }
+  #fixBox li { margin-bottom: 4px; }
+  .fixTools { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  #platformPick {
+    background: var(--lapis); color: var(--vellum);
+    border: 1px solid var(--hairline); border-radius: 8px;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 13px; padding: 8px 10px;
+  }
+  #recheckBtn {
+    background: var(--lapis); border: 1px solid var(--hairline);
+    color: var(--gold); font-size: 13px; font-weight: 600; padding: 8px 14px;
+  }
+  #allSet { margin-top: 10px; font-size: 13px; color: var(--ok); display: none; }
+
+  details.manual { border-top: 1px solid var(--hairline); padding-top: 14px; }
   summary {
     font-family: ui-sans-serif, system-ui, sans-serif;
     font-size: 13px; color: var(--vellum-dim); cursor: pointer;
@@ -127,12 +169,11 @@
   #manualInput {
     flex: 1; background: var(--lapis-raised); border: 1px solid var(--hairline);
     border-radius: 10px; color: var(--vellum); font-family: inherit;
-    font-size: 20px; padding: 10px 14px; unicode-bidi: plaintext;
+    font-size: 20px; padding: 10px 14px; unicode-bidi: plaintext; min-width: 0;
   }
   #manualInput:focus-visible { outline: 2px solid var(--gold); }
   #manualSpeak { background: var(--gold); color: #241a04; font-weight: 700; font-size: 15px; padding: 0 18px; }
 
-  /* Status / warnings */
   #status {
     font-family: ui-sans-serif, system-ui, sans-serif;
     font-size: 13px; line-height: 1.55; color: var(--vellum-dim);
@@ -180,7 +221,21 @@
 
   <div id="status"></div>
 
-  <details>
+  <section id="voicesCard">
+    <h2>Voices on this device</h2>
+    <div class="vrow"><span class="vlang">Hebrew · עברית</span><span class="vstat" id="heStat">checking…</span></div>
+    <div class="vrow"><span class="vlang">Greek · Ἑλληνική</span><span class="vstat" id="elStat">checking…</span></div>
+    <div id="allSet">✓ You're all set — both languages can be spoken offline.</div>
+    <div id="fixBox" hidden>
+      <div id="fixGuide"></div>
+      <div class="fixTools">
+        <select id="platformPick" aria-label="Choose your device type"></select>
+        <button id="recheckBtn">Re-check voices</button>
+      </div>
+    </div>
+  </section>
+
+  <details class="manual">
     <summary>Type or paste a word by hand</summary>
     <div id="manualBox">
       <input id="manualInput" type="text" autocomplete="off" autocapitalize="off"
@@ -208,6 +263,13 @@
   const speedVal = document.getElementById('speedVal');
   const manualInput = document.getElementById('manualInput');
   const manualSpeak = document.getElementById('manualSpeak');
+  const heStat = document.getElementById('heStat');
+  const elStat = document.getElementById('elStat');
+  const fixBox = document.getElementById('fixBox');
+  const fixGuide = document.getElementById('fixGuide');
+  const platformPick = document.getElementById('platformPick');
+  const recheckBtn = document.getElementById('recheckBtn');
+  const allSet = document.getElementById('allSet');
 
   let currentWord = '';
   let currentLang = null;
@@ -215,9 +277,116 @@
 
   const LANG_NAMES = { he: 'Hebrew · עברית', el: 'Greek · Ἑλληνική' };
 
-  function loadVoices() { voices = speechSynthesis.getVoices() || []; }
-  loadVoices();
-  if ('onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged = loadVoices;
+  /* ---------- Platform detection & voice-install guides ---------- */
+
+  const GUIDES = {
+    android: {
+      label: 'Android / Samsung',
+      html: '<b>Install Hebrew or Greek voices on Android:</b><ol>' +
+        '<li>Open <b>Settings → General management → Text-to-speech output</b> (on some phones: Settings → Accessibility → Text-to-speech).</li>' +
+        '<li>Make sure the preferred engine is <b>Speech Services by Google</b>, then tap the <b>gear ⚙</b> next to it.</li>' +
+        '<li>Tap <b>Install voice data</b>, then choose <b>Hebrew</b> and/or <b>Greek</b> to download.</li>' +
+        '<li>Come back here and tap <b>Re-check voices</b>.</li></ol>' +
+        'The download is one-time; after that, speech works fully offline.'
+    },
+    ios: {
+      label: 'iPhone / iPad',
+      html: '<b>Install Hebrew or Greek voices on iPhone/iPad:</b><ol>' +
+        '<li>Open <b>Settings → Accessibility → Spoken Content → Voices</b>.</li>' +
+        '<li>Choose <b>Hebrew</b> (voice: Carmit) or <b>Greek</b> (voice: Melina) and tap the download.</li>' +
+        '<li>Return here and tap <b>Re-check voices</b>.</li></ol>' +
+        'Most iPhones and iPads already include these voices.'
+    },
+    windows: {
+      label: 'Windows',
+      html: '<b>Install Hebrew or Greek voices on Windows:</b><ol>' +
+        '<li>Open <b>Settings → Time &amp; Language → Language &amp; region</b>.</li>' +
+        '<li>Click <b>Add a language</b>, pick <b>Hebrew</b> or <b>Greek</b>, and check the <b>Text-to-speech</b> feature during install.</li>' +
+        '<li>Restart the browser, return here, and tap <b>Re-check voices</b>.</li></ol>' +
+        'Note: Chrome and Edge on Windows also offer online voices that work without this step while you\u2019re connected.'
+    },
+    mac: {
+      label: 'Mac',
+      html: '<b>Install Hebrew or Greek voices on a Mac:</b><ol>' +
+        '<li>Open <b>System Settings → Accessibility → Spoken Content</b>.</li>' +
+        '<li>Click <b>System Voice → Manage Voices…</b></li>' +
+        '<li>Find <b>Hebrew</b> (Carmit) or <b>Greek</b> (Melina) and download.</li>' +
+        '<li>Restart the browser, return here, and tap <b>Re-check voices</b>.</li></ol>'
+    },
+    linux: {
+      label: 'Linux',
+      html: '<b>Hebrew or Greek voices on Linux:</b><ol>' +
+        '<li>Most browsers on Linux use <b>speech-dispatcher</b> with <b>espeak-ng</b>, which already includes Hebrew and Greek.</li>' +
+        '<li>If nothing is found, install them: <b>sudo apt install espeak-ng speech-dispatcher</b> (Debian/Ubuntu) or the equivalent for your distro.</li>' +
+        '<li>Restart the browser, return here, and tap <b>Re-check voices</b>.</li></ol>'
+    }
+  };
+
+  function detectPlatform() {
+    const ua = navigator.userAgent || '';
+    if (/Android/i.test(ua)) return 'android';
+    if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
+    // iPadOS pretends to be a Mac but has touch
+    if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return 'ios';
+    if (/Windows/i.test(ua)) return 'windows';
+    if (/Macintosh|Mac OS X/i.test(ua)) return 'mac';
+    if (/Linux/i.test(ua)) return 'linux';
+    return 'android';
+  }
+
+  // Build the platform picker
+  const detected = detectPlatform();
+  Object.keys(GUIDES).forEach(key => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = GUIDES[key].label + (key === detected ? ' (this device)' : '');
+    if (key === detected) opt.selected = true;
+    platformPick.appendChild(opt);
+  });
+
+  function showGuide() {
+    fixGuide.innerHTML = GUIDES[platformPick.value].html;
+  }
+  platformPick.addEventListener('change', showGuide);
+
+  /* ---------- Voice loading & status ---------- */
+
+  function findVoice(lang) {
+    const tags = lang === 'he' ? ['he', 'iw'] : ['el'];
+    const match = v => tags.some(t => v.lang && v.lang.toLowerCase().startsWith(t));
+    return voices.find(v => match(v) && v.localService) || voices.find(match) || null;
+  }
+
+  function updateVoiceStatus() {
+    voices = speechSynthesis.getVoices() || [];
+    if (!voices.length) {
+      heStat.textContent = 'checking…'; heStat.className = 'vstat';
+      elStat.textContent = 'checking…'; elStat.className = 'vstat';
+      return;
+    }
+    const he = findVoice('he');
+    const el = findVoice('el');
+    heStat.textContent = he ? '✓ ' + he.name : 'Not installed';
+    heStat.className = 'vstat ' + (he ? 'ok' : 'miss');
+    elStat.textContent = el ? '✓ ' + el.name : 'Not installed';
+    elStat.className = 'vstat ' + (el ? 'ok' : 'miss');
+    if (he && el) {
+      fixBox.hidden = true;
+      allSet.style.display = 'block';
+    } else {
+      allSet.style.display = 'none';
+      fixBox.hidden = false;
+      showGuide();
+    }
+  }
+
+  updateVoiceStatus();
+  if ('onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged = updateVoiceStatus;
+  // Re-check when the user comes back from Settings
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) updateVoiceStatus(); });
+  recheckBtn.addEventListener('click', updateVoiceStatus);
+
+  /* ---------- Word handling & speech ---------- */
 
   function detectScript(text) {
     if (/[\u0590-\u05FF\uFB1D-\uFB4F]/.test(text)) return 'he';
@@ -226,16 +395,8 @@
   }
 
   function cleanWord(text) {
-    // keep Hebrew (incl. niqqud + presentation forms), Greek (incl. polytonic), spaces
     const kept = text.match(/[\u0590-\u05FF\uFB1D-\uFB4F\u0370-\u03FF\u1F00-\u1FFF\s]+/g);
     return kept ? kept.join(' ').replace(/\s+/g, ' ').trim() : '';
-  }
-
-  function findVoice(lang) {
-    const tags = lang === 'he' ? ['he', 'iw'] : ['el'];
-    // prefer local (offline) voices
-    const match = v => tags.some(t => v.lang && v.lang.toLowerCase().startsWith(t));
-    return voices.find(v => match(v) && v.localService) || voices.find(match) || null;
   }
 
   function warn(html) { statusBox.innerHTML = html; statusBox.className = 'warn'; }
@@ -249,7 +410,9 @@
     if (v) { u.voice = v; voiceNote.textContent = 'Voice: ' + v.name; }
     else {
       voiceNote.textContent = '';
-      warn('<b>No ' + (lang === 'he' ? 'Hebrew' : 'Greek') + ' voice found on this device.</b> On a Samsung tablet: Settings → General management → Text-to-speech → Google Speech Services → Settings → Install voice data, then add ' + (lang === 'he' ? 'Hebrew' : 'Greek') + '.');
+      warn('<b>No ' + (lang === 'he' ? 'Hebrew' : 'Greek') + ' voice is installed yet.</b> See \u201cVoices on this device\u201d below for the exact steps on this device.');
+      fixBox.hidden = false;
+      showGuide();
     }
     u.rate = rateOverride ?? parseFloat(rateSlider.value);
     u.pitch = 1;
@@ -296,7 +459,6 @@
   manualSpeak.addEventListener('click', () => present(manualInput.value));
   manualInput.addEventListener('keydown', e => { if (e.key === 'Enter') present(manualInput.value); });
 
-  // Register service worker for offline use
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
