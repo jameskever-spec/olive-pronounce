@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&family=Noto+Serif+Hebrew:wght@400;600&display=swap" rel="stylesheet">
+<script src="espeakng.min.js" defer></script>
 <style>
   :root {
     --lapis: #10162b;
@@ -175,6 +176,10 @@
   }
   #allSet { margin-top: 10px; font-size: 13px; color: var(--ok); display: none; }
   .voiceHint { margin-top: 10px; font-size: 12px; color: var(--vellum-dim); line-height: 1.5; }
+  #fixToggle {
+    background: none; border: none; color: var(--gold);
+    font-size: 12px; padding: 0; margin-top: 8px; text-decoration: underline;
+  }
 
   details.manual { border-top: 1px solid var(--hairline); padding-top: 14px; }
   summary {
@@ -235,6 +240,7 @@
   <div class="row">
     <button class="secondary" id="againBtn" disabled>Speak again</button>
     <button class="secondary" id="slowBtn" disabled>Speak slowly</button>
+    <button class="secondary" id="clearBtn" disabled>Clear</button>
   </div>
 
   <div class="speed">
@@ -249,8 +255,10 @@
     <h2>Voices on this device</h2>
     <div class="vrow"><span class="vlang">Hebrew · עברית</span><span class="vstat" id="heStat">checking…</span></div>
     <div class="vrow"><span class="vlang">Greek · Ἑλληνική</span><span class="vstat" id="elStat">checking…</span></div>
+    <div class="vrow"><span class="vlang">Greek style</span><select id="grcPick" aria-label="Greek pronunciation style"><option value="device">Modern (device voice)</option><option value="ancient">Ancient · built-in</option></select></div>
     <div class="vrow"><span class="vlang">English narrator</span><select id="enVoicePick" aria-label="Choose English narrator voice"><option>checking…</option></select></div>
-    <div id="allSet">✓ You're all set — everything can be spoken offline.</div>
+    <div id="allSet">✓ Everything can be spoken on this device.</div>
+    <button id="fixToggle" hidden>Show how to install higher-quality device voices</button>
     <div id="fixBox" hidden>
       <div id="fixGuide"></div>
       <div class="fixTools">
@@ -258,7 +266,7 @@
         <button id="recheckBtn">Re-check voices</button>
       </div>
     </div>
-    <div class="voiceHint">The narrator list shows every English voice this device offers. To add more voices (male, female, other accents), install them in your device's text-to-speech settings — they'll appear here automatically.</div>
+    <div class="voiceHint">Lexis carries its own built-in Hebrew and Greek voices, so pronunciation works on every device with nothing to install. Device voices, where available, sound more natural — the rows above show which kind you're getting.</div>
   </section>
 
   <details class="manual">
@@ -272,9 +280,9 @@
 </main>
 
 <footer>
-  Speech is generated on this device by its installed text-to-speech voices.<br>
+  Speech is generated on this device — by its installed voices, or by Lexis's built-in engine.<br>
   Verse numbers and bracketed notes are removed automatically during English narration.<br>
-  Lexis v4
+  Lexis v6
 </footer>
 
 <script>
@@ -282,49 +290,126 @@
   const $ = id => document.getElementById(id);
   const bigWord = $('bigWord'), langBadge = $('langBadge'), voiceNote = $('voiceNote');
   const statusBox = $('status'), pasteBtn = $('pasteBtn'), readEnBtn = $('readEnBtn');
-  const againBtn = $('againBtn'), slowBtn = $('slowBtn');
+  const againBtn = $('againBtn'), slowBtn = $('slowBtn'), clearBtn = $('clearBtn');
   const pauseBtn = $('pauseBtn'), stopBtn = $('stopBtn'), readControls = $('readControls');
   const rateSlider = $('rate'), speedVal = $('speedVal');
   const manualInput = $('manualInput'), manualSpeak = $('manualSpeak');
-  const heStat = $('heStat'), elStat = $('elStat'), enVoicePick = $('enVoicePick');
-  const fixBox = $('fixBox'), fixGuide = $('fixGuide');
+  const heStat = $('heStat'), elStat = $('elStat'), enVoicePick = $('enVoicePick'), grcPick = $('grcPick');
+  const fixBox = $('fixBox'), fixGuide = $('fixGuide'), fixToggle = $('fixToggle');
   const platformPick = $('platformPick'), recheckBtn = $('recheckBtn'), allSet = $('allSet');
 
   let currentWord = '', currentLang = null, voices = [];
   let reading = false, paused = false, sentIndex = 0, sentences = [];
+  let speechGen = 0;   // bumped on every stop/cancel so stale audio callbacks are ignored
 
   const LANG_NAMES = { he: 'Hebrew · עברית', el: 'Greek · Ἑλληνική', en: 'English narration' };
+
+  /* ---------- Built-in engine (eSpeak-NG via WebAssembly) ---------- */
+
+  let espeak = null, espeakReady = false, audioCtx = null;
+  let activeSources = [];
+
+  function initEspeak() {
+    if (espeak || typeof eSpeakNG === 'undefined') return;
+    try {
+      espeak = new eSpeakNG('espeakng.worker.js', function () {
+        espeakReady = true;
+        updateVoiceStatus();
+      });
+    } catch (e) { espeak = null; }
+  }
+  window.addEventListener('load', () => setTimeout(initEspeak, 600));
+
+  function getCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function stopBuiltin() {
+    activeSources.forEach(s => { try { s.stop(); } catch (e) {} });
+    activeSources = [];
+  }
+
+  function speakBuiltin(text, voice, rate, onend) {
+    initEspeak();
+    if (!espeak || !espeakReady) { if (onend) onend(); return false; }
+    const gen = speechGen;
+    const ctx = getCtx();
+    espeak.set_voice(voice);
+    espeak.set_pitch(50);
+    espeak.set_rate(Math.max(80, Math.min(450, Math.round(170 * rate))));
+    let t = ctx.currentTime + 0.06;
+    let pending = 0, doneStreaming = false, gotAny = false;
+    function maybeEnd() {
+      if (doneStreaming && pending === 0 && gen === speechGen && onend) onend();
+    }
+    espeak.synthesize(text, function (samples) {
+      if (gen !== speechGen) return;
+      if (samples && samples.byteLength) {
+        gotAny = true;
+        const f = new Float32Array(samples);
+        if (!f.length) return;
+        const buf = ctx.createBuffer(1, f.length, 22050);
+        buf.getChannelData(0).set(f);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        const start = Math.max(t, ctx.currentTime + 0.02);
+        src.start(start);
+        t = start + buf.duration;
+        pending++;
+        activeSources.push(src);
+        src.onended = function () {
+          pending--;
+          const i = activeSources.indexOf(src);
+          if (i > -1) activeSources.splice(i, 1);
+          maybeEnd();
+        };
+      } else {
+        doneStreaming = true;
+        if (!gotAny) { if (gen === speechGen && onend) onend(); }
+        else maybeEnd();
+      }
+    });
+    return true;
+  }
+
+  function stopAllAudio() {
+    speechGen++;
+    speechSynthesis.cancel();
+    stopBuiltin();
+  }
 
   /* ---------- Platform detection & voice-install guides ---------- */
 
   const GUIDES = {
     android: {
       label: 'Android / Samsung',
-      html: '<b>Install voices on Android:</b><ol>' +
+      html: '<b>Install natural voices on Android:</b><ol>' +
         '<li>Open <b>Settings → General management → Text-to-speech output</b> (on some phones: Settings → Accessibility → Text-to-speech).</li>' +
         '<li>Make sure the preferred engine is <b>Speech Services by Google</b>, then tap the <b>gear ⚙</b> next to it.</li>' +
         '<li>Tap <b>Install voice data</b>, then choose <b>Hebrew</b>, <b>Greek</b>, or additional <b>English</b> voices to download.</li>' +
         '<li>Come back here and tap <b>Re-check voices</b>.</li></ol>' +
-        'Downloads are one-time; after that, speech works fully offline.'
+        'Downloads are one-time; after that, these voices work fully offline.'
     },
     ios: {
       label: 'iPhone / iPad',
-      html: '<b>Install voices on iPhone/iPad:</b><ol>' +
+      html: '<b>Install natural voices on iPhone/iPad:</b><ol>' +
         '<li>Open <b>Settings → Accessibility → Spoken Content → Voices</b>.</li>' +
         '<li>Choose <b>Hebrew</b> (Carmit), <b>Greek</b> (Melina), or <b>English</b> for more narrator options, and tap the download.</li>' +
         '<li>Return here and tap <b>Re-check voices</b>.</li></ol>'
     },
     windows: {
       label: 'Windows',
-      html: '<b>Install voices on Windows:</b><ol>' +
+      html: '<b>Install natural voices on Windows:</b><ol>' +
         '<li>Open <b>Settings → Time &amp; Language → Language &amp; region</b>.</li>' +
         '<li>Click <b>Add a language</b>, pick <b>Hebrew</b> or <b>Greek</b>, and check the <b>Text-to-speech</b> feature during install.</li>' +
-        '<li>Restart the browser, return here, and tap <b>Re-check voices</b>.</li></ol>' +
-        'Chrome and Edge on Windows also offer online voices that work without this step while connected.'
+        '<li>Restart the browser, return here, and tap <b>Re-check voices</b>.</li></ol>'
     },
     mac: {
       label: 'Mac',
-      html: '<b>Install voices on a Mac:</b><ol>' +
+      html: '<b>Install natural voices on a Mac:</b><ol>' +
         '<li>Open <b>System Settings → Accessibility → Spoken Content</b>.</li>' +
         '<li>Click <b>System Voice → Manage Voices…</b></li>' +
         '<li>Download <b>Hebrew</b> (Carmit), <b>Greek</b> (Melina), or extra <b>English</b> voices.</li>' +
@@ -332,10 +417,10 @@
     },
     linux: {
       label: 'Linux',
-      html: '<b>Voices on Linux:</b><ol>' +
-        '<li>Most browsers on Linux use <b>speech-dispatcher</b> with <b>espeak-ng</b>, which already includes Hebrew, Greek, and English.</li>' +
-        '<li>If nothing is found, install them: <b>sudo apt install espeak-ng speech-dispatcher</b> (Debian/Ubuntu) or the equivalent for your distro.</li>' +
-        '<li>Restart the browser, return here, and tap <b>Re-check voices</b>.</li></ol>'
+      html: '<b>About voices on Linux:</b><ol>' +
+        '<li><b>Chrome and Edge on Linux never use system voices</b> — they only offer Google\u2019s online English voices. Lexis\u2019s built-in engine covers Hebrew and Greek there automatically; nothing to install.</li>' +
+        '<li><b>Firefox</b> does use system voices: install them with <b>sudo apt install espeak-ng speech-dispatcher</b> (Debian/Ubuntu/Pop!_OS), then restart Firefox.</li>' +
+        '<li>Return here and tap <b>Re-check voices</b>.</li></ol>'
     }
   };
 
@@ -360,8 +445,13 @@
   });
   function showGuide() { fixGuide.innerHTML = GUIDES[platformPick.value].html; }
   platformPick.addEventListener('change', showGuide);
+  fixToggle.addEventListener('click', () => {
+    fixBox.hidden = !fixBox.hidden;
+    fixToggle.textContent = fixBox.hidden ? 'Show how to install higher-quality device voices' : 'Hide install instructions';
+    if (!fixBox.hidden) showGuide();
+  });
 
-  /* ---------- Voice loading, status & English narrator picker ---------- */
+  /* ---------- Voice loading, status & pickers ---------- */
 
   function remember(key, val) { try { localStorage.setItem(key, val); } catch (e) {} }
   function recall(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
@@ -387,12 +477,6 @@
     const list = englishVoices();
     const saved = recall('lexis-en-voice');
     enVoicePick.innerHTML = '';
-    if (!list.length) {
-      const opt = document.createElement('option');
-      opt.textContent = 'None found';
-      enVoicePick.appendChild(opt);
-      return;
-    }
     list.forEach(v => {
       const opt = document.createElement('option');
       opt.value = v.name;
@@ -400,25 +484,43 @@
       if (v.name === saved) opt.selected = true;
       enVoicePick.appendChild(opt);
     });
+    if (!list.length) {
+      const opt = document.createElement('option');
+      opt.value = '__builtin__';
+      opt.textContent = espeakReady ? 'Built-in (Lexis)' : 'Loading built-in…';
+      enVoicePick.appendChild(opt);
+    }
   }
   enVoicePick.addEventListener('change', () => remember('lexis-en-voice', enVoicePick.value));
 
+  const savedGreek = recall('lexis-greek-mode');
+  if (savedGreek) grcPick.value = savedGreek;
+  grcPick.addEventListener('change', () => remember('lexis-greek-mode', grcPick.value));
+
   function updateVoiceStatus() {
     voices = speechSynthesis.getVoices() || [];
-    if (!voices.length) return;
     const he = findVoice('he'), el = findVoice('el');
-    heStat.textContent = he ? '✓ ' + he.name : 'Not installed';
-    heStat.className = 'vstat ' + (he ? 'ok' : 'miss');
-    elStat.textContent = el ? '✓ ' + el.name : 'Not installed';
-    elStat.className = 'vstat ' + (el ? 'ok' : 'miss');
+    function label(native) {
+      if (native) return { text: '\u2713 ' + native.name, cls: 'ok' };
+      if (espeakReady) return { text: '\u2713 Built-in (Lexis)', cls: 'ok' };
+      if (espeak) return { text: 'Loading built-in\u2026', cls: '' };
+      return { text: 'Not installed', cls: 'miss' };
+    }
+    const hl = label(he), gl = label(el);
+    heStat.textContent = hl.text; heStat.className = 'vstat ' + hl.cls;
+    elStat.textContent = gl.text; elStat.className = 'vstat ' + gl.cls;
     populateEnglishPicker();
-    if (he && el) {
-      fixBox.hidden = true;
-      allSet.style.display = 'block';
-    } else {
-      allSet.style.display = 'none';
-      fixBox.hidden = false;
+    const covered = (he || espeakReady) && (el || espeakReady);
+    allSet.style.display = covered ? 'block' : 'none';
+    if (covered && !(he && el)) {
+      fixToggle.hidden = false;             // built-in works; nicer voices optional
+    } else if (!covered) {
+      fixToggle.hidden = true;
+      fixBox.hidden = false;                // nothing works yet: show instructions
       showGuide();
+    } else {
+      fixToggle.hidden = true;              // native voices everywhere
+      fixBox.hidden = true;
     }
   }
 
@@ -443,12 +545,12 @@
 
   function cleanEnglish(text) {
     let t = text;
-    t = t.replace(/\[[^\]]*\]/g, ' ');                      // [translator notes], [a]
-    t = t.replace(/\((?:[a-z]|[ivxlc]{1,4}|\d{1,3})\)/gi, ' '); // (a) (12) footnote markers
-    t = t.replace(/[\u2070-\u209F\u00B9\u00B2\u00B3\u00AA\u00BA]/g, ''); // super/subscripts
-    t = t.replace(/\b\d+\s*:\s*\d+(?:\s*[-\u2013]\s*\d+)?\b/g, ' ');    // 3:16, 3:16-18 refs
-    t = t.replace(/\d+/g, ' ');                              // verse numbers
-    t = t.replace(/\s+([,.;:!?'\u2019\u201D)])/g, '$1');     // tidy space before punctuation
+    t = t.replace(/\[[^\]]*\]/g, ' ');
+    t = t.replace(/\((?:[a-z]|[ivxlc]{1,4}|\d{1,3})\)/gi, ' ');
+    t = t.replace(/[\u2070-\u209F\u00B9\u00B2\u00B3\u00AA\u00BA]/g, '');
+    t = t.replace(/\b\d+\s*:\s*\d+(?:\s*[-\u2013]\s*\d+)?\b/g, ' ');
+    t = t.replace(/\d+/g, ' ');
+    t = t.replace(/\s+([,.;:!?'\u2019\u201D)])/g, '$1');
     t = t.replace(/\s+/g, ' ').trim();
     return t;
   }
@@ -459,7 +561,7 @@
     parts.forEach(p => {
       p = p.trim();
       if (!p) return;
-      while (p.length > 220) {                // keep utterances short so Android never stalls
+      while (p.length > 220) {
         let cut = p.lastIndexOf(',', 200);
         if (cut < 80) cut = p.lastIndexOf(' ', 200);
         if (cut < 1) cut = 200;
@@ -482,21 +584,36 @@
 
   function speakWord(word, lang, rateOverride) {
     stopReading(true);
-    speechSynthesis.cancel();
+    stopAllAudio();
+    const rate = rateOverride ?? parseFloat(rateSlider.value);
+    const native = findVoice(lang);
+    const wantAncient = (lang === 'el' && grcPick.value === 'ancient');
+    const useBuiltin = wantAncient || !native;
+
+    bigWord.classList.add('speaking');
+    const done = () => bigWord.classList.remove('speaking');
+
+    if (useBuiltin) {
+      const evoice = lang === 'he' ? 'he' : (wantAncient || !native ? 'grc' : 'el');
+      if (espeakReady) {
+        voiceNote.textContent = 'Voice: Built-in ' + (evoice === 'grc' ? 'Ancient Greek' : (evoice === 'he' ? 'Hebrew' : 'Greek')) + ' (Lexis)';
+        speakBuiltin(word, evoice, rate, done);
+        return;
+      }
+      if (!native) {
+        done();
+        warn('<b>The built-in voice is still loading</b> (first run downloads it once). Try again in a few seconds.');
+        return;
+      }
+      // ancient requested but engine not ready: fall through to native
+    }
     const u = new SpeechSynthesisUtterance(word);
     u.lang = lang === 'he' ? 'he-IL' : 'el-GR';
-    const v = findVoice(lang);
-    if (v) { u.voice = v; voiceNote.textContent = 'Voice: ' + v.name; }
-    else {
-      voiceNote.textContent = '';
-      warn('<b>No ' + (lang === 'he' ? 'Hebrew' : 'Greek') + ' voice is installed yet.</b> See \u201cVoices on this device\u201d below for the exact steps.');
-      fixBox.hidden = false;
-      showGuide();
-    }
-    u.rate = rateOverride ?? parseFloat(rateSlider.value);
-    bigWord.classList.add('speaking');
-    u.onend = () => bigWord.classList.remove('speaking');
-    u.onerror = () => bigWord.classList.remove('speaking');
+    u.voice = native;
+    voiceNote.textContent = 'Voice: ' + native.name;
+    u.rate = rate;
+    u.onend = done;
+    u.onerror = done;
     speechSynthesis.speak(u);
   }
 
@@ -504,12 +621,32 @@
 
   function stopReading(silent) {
     reading = false; paused = false;
-    speechSynthesis.cancel();
+    stopAllAudio();
     readControls.hidden = true;
     pauseBtn.textContent = 'Pause';
     const act = bigWord.querySelector('.sent.active');
     if (act) act.classList.remove('active');
     if (!silent) voiceNote.textContent = '';
+  }
+
+  function speakSentence(text, onend) {
+    const v = selectedEnglishVoice();
+    if (!v) {
+      if (espeakReady) {
+        voiceNote.textContent = 'Narrator: Built-in (Lexis)';
+        speakBuiltin(text, 'en', parseFloat(rateSlider.value), onend);
+        return;
+      }
+      onend();
+      return;
+    }
+    const u = new SpeechSynthesisUtterance(text);
+    u.voice = v; u.lang = v.lang;
+    voiceNote.textContent = 'Narrator: ' + v.name;
+    u.rate = parseFloat(rateSlider.value);
+    u.onend = onend;
+    u.onerror = onend;
+    speechSynthesis.speak(u);
   }
 
   function readNextSentence() {
@@ -519,14 +656,9 @@
     spans.forEach(s => s.classList.remove('active'));
     const span = spans[sentIndex];
     if (span) { span.classList.add('active'); span.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-    const u = new SpeechSynthesisUtterance(sentences[sentIndex]);
-    const v = selectedEnglishVoice();
-    if (v) { u.voice = v; u.lang = v.lang; voiceNote.textContent = 'Narrator: ' + v.name; }
-    else { u.lang = 'en-US'; }
-    u.rate = parseFloat(rateSlider.value);
-    u.onend = () => { if (reading && !paused) { sentIndex++; readNextSentence(); } };
-    u.onerror = () => { if (reading && !paused) { sentIndex++; readNextSentence(); } };
-    speechSynthesis.speak(u);
+    speakSentence(sentences[sentIndex], () => {
+      if (reading && !paused) { sentIndex++; readNextSentence(); }
+    });
   }
 
   function presentEnglish(raw) {
@@ -547,6 +679,7 @@
     langBadge.hidden = false;
     againBtn.disabled = false;
     slowBtn.disabled = true;
+    clearBtn.disabled = false;
     readControls.hidden = false;
     reading = true; paused = false;
     readNextSentence();
@@ -557,7 +690,7 @@
     if (!paused) {
       paused = true;
       pauseBtn.textContent = 'Resume';
-      speechSynthesis.cancel();   // Chrome on Android can't reliably resume a paused engine,
+      stopAllAudio();             // Chrome on Android can't reliably resume a paused engine,
     } else {                      // so we stop fully and restart at the current sentence.
       paused = false;
       pauseBtn.textContent = 'Pause';
@@ -581,10 +714,27 @@
     langBadge.hidden = false;
     againBtn.disabled = false;
     slowBtn.disabled = false;
+    clearBtn.disabled = false;
     readControls.hidden = true;
     speakWord(word, lang);
     return true;
   }
+
+  function clearAll() {
+    stopReading(true);
+    stopAllAudio();
+    clearWarn();
+    currentWord = ''; currentLang = null;
+    bigWord.className = 'empty';
+    bigWord.textContent = 'Highlight a Hebrew or Greek word — or a whole English passage — in Olive Tree, tap Copy, then come back and tap a button below.';
+    langBadge.hidden = true;
+    voiceNote.textContent = '';
+    againBtn.disabled = true;
+    slowBtn.disabled = true;
+    clearBtn.disabled = true;
+    manualInput.value = '';
+  }
+  clearBtn.addEventListener('click', clearAll);
 
   function route(raw, forceEnglish) {
     const script = detectScript(raw || '');

@@ -1,10 +1,13 @@
-const CACHE = 'lexis-v4';
+const CACHE = 'lexis-v5';
 const PRECACHE = [
   './',
   './index.html',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './espeakng.min.js',
+  './espeakng.worker.js',
+  './espeakng.worker.data'
 ];
 
 self.addEventListener('install', (e) => {
