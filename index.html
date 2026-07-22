@@ -181,6 +181,48 @@
     font-size: 12px; padding: 0; margin-top: 8px; text-decoration: underline;
   }
 
+  /* Bible search */
+  #searchCard {
+    background: var(--lapis-raised);
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    padding: 14px;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  #searchRow { display: flex; gap: 10px; }
+  #searchInput {
+    flex: 1; min-width: 0;
+    background: var(--lapis); border: 1px solid var(--hairline);
+    border-radius: 10px; color: var(--vellum);
+    font-family: 'Cardo', serif; font-size: 17px; padding: 11px 14px;
+  }
+  #searchInput:focus-visible { outline: 2px solid var(--gold); }
+  #searchBtn { background: var(--gold); color: #241a04; font-weight: 700; font-size: 15px; padding: 0 18px; }
+  #searchMeta { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  #searchMeta select { max-width: none; }
+  #searchStatus { font-size: 12px; color: var(--vellum-dim); }
+  #resultsBox { margin-top: 4px; }
+  .result {
+    border-top: 1px solid rgba(154,160,180,0.14);
+    padding: 12px 2px 10px;
+  }
+  .rref { color: var(--gold); font-weight: 600; font-size: 13px; letter-spacing: 0.04em; }
+  .rtext { font-family: 'Cardo', serif; font-size: 16.5px; line-height: 1.6; color: var(--vellum); margin: 5px 0 8px; }
+  .rtext mark { background: rgba(212,169,68,0.18); color: var(--gold); border-radius: 3px; padding: 0 1px; }
+  .ract { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ract button, .ract a {
+    background: var(--lapis); border: 1px solid var(--hairline); border-radius: 8px;
+    color: var(--vellum-dim); font-size: 12px; padding: 6px 11px;
+    text-decoration: none; font-family: ui-sans-serif, system-ui, sans-serif; cursor: pointer;
+  }
+  .ract .conn.open { color: var(--gold); border-color: var(--gold); }
+  .connBox { margin-top: 8px; border-left: 2px solid var(--hairline); padding-left: 10px; display: none; }
+  .connBox.show { display: block; }
+  .connItem { padding: 6px 0; cursor: pointer; }
+  .connItem .rref { font-size: 12px; }
+  .connItem .csnip { font-family: 'Cardo', serif; font-size: 14px; color: var(--vellum-dim); line-height: 1.45; }
+  .connItem:active .csnip { color: var(--vellum); }
+
   details.manual { border-top: 1px solid var(--hairline); padding-top: 14px; }
   summary {
     font-family: ui-sans-serif, system-ui, sans-serif;
@@ -223,6 +265,23 @@
 </header>
 
 <main>
+  <section id="searchCard">
+    <div id="searchRow">
+      <input id="searchInput" type="search" autocomplete="off"
+             placeholder='Search the Bible — a word, phrase, or "John 3:16"'
+             aria-label="Search the Bible">
+      <button id="searchBtn">Search</button>
+    </div>
+    <div id="searchMeta">
+      <select id="trPick" aria-label="Bible translation">
+        <option value="KJV">KJV — King James</option>
+        <option value="WEB">WEB — World English</option>
+      </select>
+      <span id="searchStatus"></span>
+    </div>
+    <div id="resultsBox"></div>
+  </section>
+
   <div id="wordCard">
     <span id="langBadge" hidden></span>
     <div id="bigWord" class="empty">Highlight a Hebrew or Greek word — or a whole English passage — in Olive Tree, tap Copy, then come back and tap a button below.</div>
@@ -282,7 +341,8 @@
 <footer>
   Speech is generated on this device — by its installed voices, or by Lexis's built-in engine.<br>
   Verse numbers and bracketed notes are removed automatically during English narration.<br>
-  Lexis v6
+  Offline Bible search: KJV and World English Bible (public domain) &middot; Connections from the Treasury of Scripture Knowledge.<br>
+  Lexis v7
 </footer>
 
 <script>
@@ -772,6 +832,295 @@
 
   manualSpeak.addEventListener('click', () => route(manualInput.value, false));
   manualInput.addEventListener('keydown', e => { if (e.key === 'Enter') route(manualInput.value, false); });
+
+  /* ================= OFFLINE BIBLE SEARCH ================= */
+
+  const searchInput = $('searchInput'), searchBtn = $('searchBtn');
+  const trPick = $('trPick'), searchStatus = $('searchStatus'), resultsBox = $('resultsBox');
+
+  const BOOK_ALIASES = [
+    ['Genesis','gen','ge','gn'],['Exodus','exod','exo','ex'],['Leviticus','lev','le','lv'],
+    ['Numbers','num','nu','nm','numb'],['Deuteronomy','deut','deu','dt'],['Joshua','josh','jos','jsh'],
+    ['Judges','judg','jdg','jg','jdgs'],['Ruth','rth','ru'],['1 Samuel','1sam','1sa','1s','i samuel','1 sam'],
+    ['2 Samuel','2sam','2sa','ii samuel','2 sam'],['1 Kings','1kgs','1ki','1kings','i kings'],
+    ['2 Kings','2kgs','2ki','2kings','ii kings'],['1 Chronicles','1chr','1ch','i chronicles','1 chron'],
+    ['2 Chronicles','2chr','2ch','ii chronicles','2 chron'],['Ezra','ezr'],['Nehemiah','neh','ne'],
+    ['Esther','esth','est','es'],['Job','jb'],['Psalms','psalm','ps','psa','psm','pss'],
+    ['Proverbs','prov','pro','prv','pr'],['Ecclesiastes','eccl','ecc','ec','qoh'],
+    ['Song of Solomon','song','sos','songs','song of songs','canticles','cant'],
+    ['Isaiah','isa','is'],['Jeremiah','jer','je','jr'],['Lamentations','lam','la'],
+    ['Ezekiel','ezek','eze','ezk'],['Daniel','dan','da','dn'],['Hosea','hos','ho'],
+    ['Joel','jl'],['Amos','am'],['Obadiah','obad','ob'],['Jonah','jnh','jon'],
+    ['Micah','mic','mc'],['Nahum','nah','na'],['Habakkuk','hab','hb'],
+    ['Zephaniah','zeph','zep','zp'],['Haggai','hag','hg'],['Zechariah','zech','zec','zc'],
+    ['Malachi','mal','ml'],['Matthew','matt','mat','mt'],['Mark','mrk','mk','mr'],
+    ['Luke','luk','lk'],['John','joh','jhn','jn'],['Acts','act','ac'],
+    ['Romans','rom','ro','rm'],['1 Corinthians','1cor','1co','i corinthians','1 cor'],
+    ['2 Corinthians','2cor','2co','ii corinthians','2 cor'],['Galatians','gal','ga'],
+    ['Ephesians','eph','ephes'],['Philippians','phil','php','pp'],['Colossians','col','co'],
+    ['1 Thessalonians','1thess','1th','1thes','i thessalonians'],['2 Thessalonians','2thess','2th','2thes'],
+    ['1 Timothy','1tim','1ti','i timothy'],['2 Timothy','2tim','2ti'],['Titus','tit','ti'],
+    ['Philemon','phlm','phm','pm'],['Hebrews','heb'],['James','jas','jm'],
+    ['1 Peter','1pet','1pe','1pt','i peter'],['2 Peter','2pet','2pe','2pt'],
+    ['1 John','1jn','1jhn','1joh','i john'],['2 John','2jn','2jhn'],['3 John','3jn','3jhn'],
+    ['Jude','jud','jde'],['Revelation','rev','re','apocalypse']
+  ];
+  const BOOK_NAMES = BOOK_ALIASES.map(a => a[0]);
+  const aliasMap = {};
+  BOOK_ALIASES.forEach((row, i) => row.forEach(a => aliasMap[a.toLowerCase().replace(/\s+/g,'')] = i));
+  BOOK_NAMES.forEach((n, i) => aliasMap[n.toLowerCase().replace(/\s+/g,'')] = i);
+
+  const STOP = new Set(('a an and the of that which for with they them their his her him she he it is was be been are were to in on at by from this these those there then when who whom whose what will shall do did done have has had or if all also unto upon into out up down ye thee thou thy thine hath let us we our you your i me my not no but as so said saith').split(' '));
+
+  function stem(w) {
+    w = w.replace(/'s$/,'').replace(/'$/,'');
+    if (w.length > 4) { w = w.replace(/ies$/,'y').replace(/eth$/,'e').replace(/est$/,'e'); }
+    if (w.length > 3) {
+      w = w.replace(/ings?$/,'').replace(/ed$/,'');
+      if (!/ss$/.test(w)) w = w.replace(/s$/,'');
+      w = w.replace(/ly$/,'');
+    }
+    if (w.length > 3) w = w.replace(/e$/,'');
+    return w;
+  }
+
+  const SYN_GROUPS = [
+    ['love','charity'],['spirit','ghost'],['christ','messiah','anointed'],
+    ['lord','jehovah','yahweh'],['devil','satan'],['sin','transgression','iniquity'],
+    ['forgive','pardon'],['mercy','compassion','lovingkindness'],['faith','belief','believe'],
+    ['joy','rejoice','gladness','glad'],['grace','favour','favor'],['holy','hallowed'],
+    ['pray','prayer','supplication'],['saviour','savior'],['baptize','baptism'],
+    ['happy','blessed'],['fear','afraid'],['hell','hades','sheol'],['law','commandment']
+  ];
+  const SYN = {};
+  SYN_GROUPS.forEach(g => {
+    const stems = g.map(stem);
+    stems.forEach(s => { SYN[s] = stems.filter(x => x !== s); });
+  });
+
+  const bibles = {};        // tr -> {texts, refs, inv, docLen, avgLen, norm}
+  let xrefs = null;
+  let xrefsLoading = null;
+
+  function vidOf(b, c, v) { return (b + 1) * 1000000 + c * 1000 + v; }
+  function fromVid(id) { return [Math.floor(id / 1000000) - 1, Math.floor(id / 1000) % 1000, id % 1000]; }
+
+  function tokenizeText(t) {
+    return (t.toLowerCase().match(/[a-z']+/g) || []).filter(w => !STOP.has(w)).map(stem).filter(w => w.length > 1);
+  }
+
+  function loadXrefs() {
+    if (xrefs || xrefsLoading) return xrefsLoading;
+    xrefsLoading = fetch('xrefs.json').then(r => r.json()).then(d => { xrefs = d; }).catch(() => {});
+    return xrefsLoading;
+  }
+
+  function loadTranslation(tr) {
+    if (bibles[tr]) return Promise.resolve(bibles[tr]);
+    searchStatus.textContent = 'Downloading ' + tr + ' (one-time)\u2026';
+    loadXrefs();
+    return fetch(tr.toLowerCase() + '.json').then(r => r.json()).then(data => new Promise(resolve => {
+      searchStatus.textContent = 'Indexing ' + tr + '\u2026';
+      setTimeout(() => {
+        const texts = [], refs = [], norm = [], docLen = [];
+        const inv = Object.create(null);
+        data.books.forEach((bk, b) => {
+          bk.c.forEach((ch, ci) => {
+            ch.forEach((vt, vi) => {
+              const id = texts.length;
+              texts.push(vt); refs.push([b, ci + 1, vi + 1]); norm.push(' ' + vt.toLowerCase().replace(/[^a-z ]/g, '') + ' ');
+              const toks = tokenizeText(vt);
+              docLen.push(toks.length || 1);
+              const tf = Object.create(null);
+              toks.forEach(t => { tf[t] = (tf[t] || 0) + 1; });
+              for (const t in tf) { (inv[t] || (inv[t] = [])).push(id, tf[t]); }
+            });
+          });
+        });
+        const avgLen = docLen.reduce((a, x) => a + x, 0) / docLen.length;
+        bibles[tr] = { texts, refs, norm, docLen, avgLen, inv, N: texts.length };
+        searchStatus.textContent = texts.length.toLocaleString() + ' verses ready \u2014 works offline';
+        resolve(bibles[tr]);
+      }, 30);
+    })).catch(() => {
+      searchStatus.textContent = 'Couldn\u2019t download ' + tr + ' \u2014 check your connection and try again.';
+      return null;
+    });
+  }
+
+  function parseReference(q) {
+    const m = q.trim().toLowerCase().match(/^([1-3]?\s*[a-z]+(?:\s+of\s+[a-z]+)?(?:\s+[a-z]+)?)\.?\s*(\d+)?(?:\s*[:.\s]\s*(\d+))?(?:\s*[-\u2013]\s*(\d+))?$/);
+    if (!m) return null;
+    const bkey = m[1].replace(/\s+/g, '');
+    if (!(bkey in aliasMap)) return null;
+    if (!m[2]) return null;
+    return { b: aliasMap[bkey], c: parseInt(m[2]), v: m[3] ? parseInt(m[3]) : null, vEnd: m[4] ? parseInt(m[4]) : null };
+  }
+
+  function bm25(bible, terms) {
+    const scores = Object.create(null);
+    const k1 = 1.2, bb = 0.75;
+    terms.forEach(({ t, w }) => {
+      const post = bible.inv[t];
+      if (!post) return;
+      const df = post.length / 2;
+      const idf = Math.log((bible.N - df + 0.5) / (df + 0.5) + 1);
+      for (let i = 0; i < post.length; i += 2) {
+        const id = post[i], tf = post[i + 1];
+        const dl = bible.docLen[id];
+        const s = idf * (tf * (k1 + 1)) / (tf + k1 * (1 - bb + bb * dl / bible.avgLen));
+        scores[id] = (scores[id] || 0) + s * w;
+      }
+    });
+    return scores;
+  }
+
+  function refLabel(b, c, v) { return BOOK_NAMES[b] + ' ' + c + ':' + v; }
+  function otLink(b, c, v) {
+    return 'olivetree://bible/' + BOOK_NAMES[b].replace(/ /g, '%20') + '.' + c + '.' + v;
+  }
+
+  function highlight(text, stemSet) {
+    return escapeHtml(text).replace(/[A-Za-z']+/g, w =>
+      stemSet.has(stem(w.toLowerCase())) ? '<mark>' + w + '</mark>' : w);
+  }
+
+  function resultHtml(bible, id, stemSet) {
+    const [b, c, v] = bible.refs[id];
+    const nRefs = xrefs ? (xrefs[String(vidOf(b, c, v))] || []).length : 0;
+    return '<div class="result" data-id="' + id + '">' +
+      '<span class="rref">' + refLabel(b, c, v) + ' \u00b7 ' + trPick.value + '</span>' +
+      '<div class="rtext">' + highlight(bible.texts[id], stemSet) + '</div>' +
+      '<div class="ract">' +
+        '<button class="rspeak">\uD83D\uDD0A Read</button>' +
+        '<a href="' + otLink(b, c, v) + '">Olive Tree \u2197</a>' +
+        (nRefs ? '<button class="conn">\u21c4 Connections (' + nRefs + ')</button>' : '') +
+      '</div><div class="connBox"></div></div>';
+  }
+
+  function renderConnections(box, bible, id) {
+    const [b, c, v] = bible.refs[id];
+    const list = (xrefs && xrefs[String(vidOf(b, c, v))]) || [];
+    box.innerHTML = list.map(vid2 => {
+      const [b2, c2, v2] = fromVid(vid2);
+      let snip = '';
+      const bk = bible && bibleData(trPick.value);
+      const t = verseText(trPick.value, b2, c2, v2);
+      if (t) snip = t.length > 110 ? t.slice(0, 110) + '\u2026' : t;
+      return '<div class="connItem" data-ref="' + BOOK_NAMES[b2] + ' ' + c2 + ':' + v2 + '">' +
+        '<span class="rref">' + refLabel(b2, c2, v2) + '</span>' +
+        '<div class="csnip">' + escapeHtml(snip) + '</div></div>';
+    }).join('') || '<div class="csnip">No connections recorded.</div>';
+  }
+
+  function bibleData(tr) { return bibles[tr] || null; }
+  function verseText(tr, b, c, v) {
+    const bible = bibles[tr];
+    if (!bible) return null;
+    for (let i = 0; i < bible.refs.length; i++) {} // placeholder avoided; use map below
+    return verseLookup(bible, b, c, v);
+  }
+  function verseLookup(bible, b, c, v) {
+    if (!bible.map) {
+      bible.map = Object.create(null);
+      bible.refs.forEach((r, i) => { bible.map[vidOf(r[0], r[1], r[2])] = i; });
+    }
+    const id = bible.map[vidOf(b, c, v)];
+    return id === undefined ? null : bible.texts[id];
+  }
+
+  function renderPassage(bible, ref) {
+    const out = [];
+    const startV = ref.v || 1;
+    const endV = ref.vEnd || (ref.v ? ref.v : startV + 9);
+    const stemSet = new Set();
+    for (let v = startV; v <= Math.min(endV, startV + 11); v++) {
+      const t = verseLookup(bible, ref.b, ref.c, v);
+      if (t === null) break;
+      const id = bible.map[vidOf(ref.b, ref.c, v)];
+      out.push(resultHtml(bible, id, stemSet));
+    }
+    resultsBox.innerHTML = out.join('') ||
+      '<div class="result"><div class="rtext">That reference doesn\u2019t exist in this translation \u2014 check the chapter and verse.</div></div>';
+  }
+
+  function doSearch() {
+    const q = searchInput.value.trim();
+    if (!q) return;
+    const tr = trPick.value;
+    resultsBox.innerHTML = '';
+    loadTranslation(tr).then(bible => {
+      if (!bible) return;
+      loadXrefs();
+      const ref = parseReference(q);
+      if (ref) { renderPassage(bible, ref); return; }
+      const raw = (q.toLowerCase().match(/[a-z']+/g) || []).filter(w => !STOP.has(w));
+      const primary = [...new Set(raw.map(stem))].filter(s => s.length > 1);
+      if (!primary.length) {
+        resultsBox.innerHTML = '<div class="result"><div class="rtext">Try a more specific word or a reference like \u201cJohn 3:16\u201d.</div></div>';
+        return;
+      }
+      const terms = primary.map(t => ({ t, w: 1 }));
+      const seen = new Set(primary);
+      primary.forEach(p => (SYN[p] || []).forEach(s => {
+        if (!seen.has(s)) { seen.add(s); terms.push({ t: s, w: 0.55 }); }
+      }));
+      const scores = bm25(bible, terms);
+      let ids = Object.keys(scores);
+      const phrase = ' ' + q.toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim() + ' ';
+      ids.sort((a, b2) => scores[b2] - scores[a]);
+      ids = ids.slice(0, 200).map(Number);
+      if (primary.length > 1 && phrase.trim().includes(' ')) {
+        ids.forEach(id => { if (bible.norm[id].includes(phrase)) scores[id] *= 1.8; });
+        ids.sort((a, b2) => scores[b2] - scores[a]);
+      }
+      const top = ids.slice(0, 25);
+      const stemSet = new Set(seen);
+      const ready = () => {
+        resultsBox.innerHTML = top.map(id => resultHtml(bible, id, stemSet)).join('') ||
+          '<div class="result"><div class="rtext">No verses matched \u201c' + escapeHtml(q) + '\u201d in the ' + tr + '.</div></div>';
+      };
+      if (xrefs) ready(); else (xrefsLoading || Promise.resolve()).then(ready);
+    });
+  }
+
+  resultsBox.addEventListener('click', e => {
+    const res = e.target.closest('.result');
+    const connItem = e.target.closest('.connItem');
+    if (connItem) {
+      searchInput.value = connItem.dataset.ref;
+      doSearch();
+      searchCardScroll();
+      return;
+    }
+    if (!res) return;
+    const bible = bibles[trPick.value];
+    const id = parseInt(res.dataset.id);
+    if (e.target.classList.contains('rspeak')) {
+      const [b, c, v] = bible.refs[id];
+      presentEnglish(refLabel(b, c, v) + '. ' + bible.texts[id]);
+    } else if (e.target.classList.contains('conn')) {
+      const box = res.querySelector('.connBox');
+      if (!box.classList.contains('show')) {
+        renderConnections(box, bible, id);
+        box.classList.add('show');
+        e.target.classList.add('open');
+      } else {
+        box.classList.remove('show');
+        e.target.classList.remove('open');
+      }
+    }
+  });
+  function searchCardScroll() { $('searchCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+  searchBtn.addEventListener('click', doSearch);
+  searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+  const savedTr = recall('lexis-tr');
+  if (savedTr && (savedTr === 'KJV' || savedTr === 'WEB')) trPick.value = savedTr;
+  trPick.addEventListener('change', () => {
+    remember('lexis-tr', trPick.value);
+    if (searchInput.value.trim()) doSearch(); else loadTranslation(trPick.value);
+  });
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
